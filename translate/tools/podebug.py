@@ -90,6 +90,40 @@ class podebug:
     def rewrite_xxx(self, string):
         return self._rewrite_prepend_append(string, u"xxx")
 
+    def rewrite_just_x(self, string):
+        return StringElem(u'xxx')
+
+    def rewrite_pyfmt(self, string):
+        # Some substrings that probably should not be translated will be preserved. Examples:
+        # {foo}      - format / format_html substitutions
+        # %(foo)s    - in blocktrans strings, {{foo}} is replaced with %(foo)s
+        # %s         - % operator format string
+        # href="/"   - link targets
+        # <p>        - some very simple html tags
+        replacement_char = 'x'
+        variable_pattern = r'{.*?}|%\(.*?\)[a-z]|%[a-z]|<a href="[^"]*"|<a href=\'[^\']*\'|</a>|</?[a-zA-Z][a-zA-Z]?>'
+        def _repl(val):
+            # do not replace " and \
+            return re.sub('[a-zA-Z]', replacement_char, val)
+        
+        msg_string = unicode(string)
+        pos = 0
+        dummy_string = ''
+        for m in re.finditer(variable_pattern, msg_string):
+            dummy_string += _repl(msg_string[pos:m.start()])
+            # add @@ markers so that we know what was substituted
+            # (note: will break some links, so skip markers if there
+            # could be html in string)
+            if '<' in msg_string:
+                dummy_string += m.group()
+            else:
+                # using a marker that is not a special
+                # character for msgfmt
+                dummy_string += '@' + m.group() + '@'
+            pos = m.end()
+        dummy_string += _repl(msg_string[pos:])
+	return StringElem(dummy_string)
+
     def rewrite_bracket(self, string):
         return self._rewrite_prepend_append(string, u"[", u"]")
 
